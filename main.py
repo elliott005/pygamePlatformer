@@ -1,13 +1,11 @@
 import pygame, sys, random, csv
 import os.path
 from pygame.locals import *
-pygame.init()
+pygame.init() # initialise pygame
  
-BACKGROUND = (120, 100, 255)
-RED = (255, 30, 70)
-BLUE = (10, 20, 200)
-GREEN = (50, 230, 40)
+BACKGROUND = (120, 100, 255) # define some basic colors
 
+# Globals contains the basics for the window
 from Globals import *
 
 import inputs
@@ -26,10 +24,12 @@ from Spike import Spike
 mainTheme = pygame.mixer.Sound("sfx/Stage1.wav")
 
 def main():
+    # declare a dict to easily access the levels
     levels = {"1": level1, "2": level2, "3": level3, "4": level4, "5": level5, "6": level6, "7": level7, "8": level8}
     level = "1"
-    numCoins = 0
-    unlocked = False
+    numCoins = 0 # for the player
+    unlocked = False # for the key / unlockable blocks
+    # load the save game (if it exists)
     if os.path.isfile("./save.csv"):
         with open("save.csv", "r") as save:
             csvReader = csv.reader(save)
@@ -40,12 +40,15 @@ def main():
 
     blocks, enemies, player, coins, spikes, endAreas, keys = createWorld(levels[level])
     keyImage = pygame.transform.scale(pygame.image.load("images/png/key_red.png").convert_alpha(), (levels[level].tileSize, levels[level].tileSize))
-    player.giveCoins(numCoins)
-    player.level = int(level)
-    if mainTheme.get_num_channels() == 0:
+    player.giveCoins(numCoins) # give the player the same amount of coins as when they left off
+    player.level = int(level) # we have to convert level because it is a string so we can access the dict easier
+    if mainTheme.get_num_channels() == 0: # just in case the game was restarted
         mainTheme.play(loops=-1)
+    
+    # the main game loop:
     while 1:
         for event in pygame.event.get() :
+            # handle quit by printing the FPS and saving the game
             if event.type == QUIT:
                 print(fpsClock.get_fps())
                 with open("save.csv", "w") as save:
@@ -66,11 +69,11 @@ def main():
                         main()
                         break
         
-        dt = fpsClock.get_time() / 1000
+        dt = fpsClock.get_time() / 1000 # fpsClock.get_time() returns a value in milliseconds so we need to turn it into seconds
         
         levelStart = player.level
         unlocked = player.update(dt, blocks, enemies, coins, spikes, endAreas, keys, unlocked)
-        if levelStart != player.level:
+        if levelStart != player.level: # if the player has finished the level
             level = str(player.level)
             if int(level) >= len(levels):
                 level = str(len(levels))
@@ -85,6 +88,7 @@ def main():
         drawWorld(blocks, player.rect.center, unlocked)
 
         for enemy in enemies:
+            # do not update the enemy if they are too far away from the player
             if abs(enemy.rect.top - player.rect.top) < WINDOW_HEIGHT and abs(enemy.rect.left - player.rect.left) < WINDOW_WIDTH:
                 enemy.update(dt, blocks, enemies, spikes, player.rect.centerx, unlocked)
                 enemy.draw(player.rect.center)
@@ -113,8 +117,9 @@ def main():
 def drawWorld(blocks, playerpos, unlocked):
     playerX, playerY = playerpos
     for block in blocks:
-        if type(block["rect"]) is pygame.rect.Rect:
+        if type(block["rect"]) is pygame.rect.Rect: # there are also blocks that just have coords and not rects
             if not (block["disappearing"] and unlocked):
+                # do not draw the rect if it is outside of viewing radius
                 if abs(block["rect"].top - playerY) < WINDOW_HEIGHT and abs(block["rect"].left - playerX) < WINDOW_WIDTH:
                     WINDOW.blit(block["image"], (block["rect"].left - playerX + WINDOW_WIDTH / 2, block["rect"].top - playerY + WINDOW_HEIGHT / 2))
         elif abs(block["rect"][1] - playerY) < WINDOW_HEIGHT and abs(block["rect"][0] - playerX) < WINDOW_WIDTH:
@@ -127,7 +132,8 @@ def createWorld(tilemap):
     spikes = []
     endAreas = []
     keys = []
-    player = Player(0, 0)
+    player = Player(0, 0) # just in case no player is in the tilemap
+    # load images
     grass = pygame.transform.scale(pygame.image.load("images/png/ground.png").convert_alpha(), (tilemap.tileSize, tilemap.tileSize))
     dirt = pygame.transform.scale(pygame.image.load("images/png/ground_dirt.png").convert_alpha(), (tilemap.tileSize, tilemap.tileSize))
     plant = pygame.transform.scale(pygame.image.load("images/png/alien_plant.png").convert_alpha(), (tilemap.tileSize, tilemap.tileSize / 2))
@@ -138,21 +144,22 @@ def createWorld(tilemap):
     coin = pygame.transform.scale(pygame.image.load("images/png/coin_silver.png").convert_alpha(), (tilemap.tileSize, tilemap.tileSize))
     coinGold = pygame.transform.scale(pygame.image.load("images/png/coin_gold.png").convert_alpha(), (tilemap.tileSize, tilemap.tileSize))
     lock = pygame.transform.scale(pygame.image.load("images/png/lock_red.png").convert_alpha(), (tilemap.tileSize, tilemap.tileSize))
+    # I use enumerate here to check the value of the block and know it's coords in the tilemap
     for y, row in enumerate(tilemap.map):
         for x, tile in enumerate(row):
             if tile == 1:
                 rect = pygame.Rect(x * tilemap.tileSize, y * tilemap.tileSize, tilemap.tileSize, tilemap.tileSize)
-                if random.randint(1, 7) == 1:
+                if random.randint(1, 7) == 1: # to give a bit of variety
                     image = block
                 else:
-                    if tilemap.map[max(y - 1, 0)][min(x, len(tilemap.map[max(y - 1, 0)]) - 1)] == 1:
+                    if tilemap.map[max(y - 1, 0)][min(x, len(tilemap.map[max(y - 1, 0)]) - 1)] == 1: # check if there is a block above it
                         image = dirt
                     else:
-                        if tilemap.map[y][max(x - 1, 0)] == 0 and tilemap.map[y][min(x + 1, len(tilemap.map[y]) - 1)] == 0:
+                        if tilemap.map[y][max(x - 1, 0)] == 0 and tilemap.map[y][min(x + 1, len(tilemap.map[y]) - 1)] == 0: # check if there are no blocks to either side
                             image = crate
                         else:
                             image = grass
-                            if random.randint(1, 4) == 1:
+                            if random.randint(1, 4) == 1: # add a bit of vegetation
                                 n = random.randint(1, 4)
                                 if n == 1:
                                     blocks.append({"rect": (x * tilemap.tileSize, (y - 0.5) * tilemap.tileSize), "image": shroom})

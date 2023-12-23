@@ -82,7 +82,7 @@ class Enemy:
                 self.speed.y = 0
                 self.speed.y = 0
             else:
-                self.lookingRight = not self.lookingRight
+                self.lookingRight = not self.lookingRight # turn around on collision
 
         if not colliding:
             self.rect = movedRect

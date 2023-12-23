@@ -7,9 +7,10 @@ class Player:
         self.width = 75
         self.height = 100
         self.rect = pygame.Rect(x, y, self.width, self.height)
-        self.startPosition = (x, y)
+        self.startPosition = (x, y) # to be able to reset the player's position on death
+        # the feet are to determine if the player is on the ground by checking collision with the feet
         self.feetHeight = 5
-        self.feetBufferX = 4
+        self.feetBufferX = 4 # so you can't walljump, otherwise the feet hitbox extends too far
         self.feet = pygame.Rect(x + self.feetBufferX, y - self.height - self.feetHeight, self.width - self.feetBufferX * 2, self.feetHeight)
 
         self.velocity = pygame.math.Vector2(0, 0)
@@ -17,8 +18,9 @@ class Player:
         self.acceleration = pygame.math.Vector2(1000, 900)
         self.friction = 2000
         self.direction = pygame.math.Vector2()
-        self.jumpStr = -500
+        self.jumpStr = -500 # jumpSTr is negative because the y axis goes down
 
+        # max is the number of frames - 1, speed is the number of frames per second
         self.animations = {
             "walk": {"frames": [pygame.transform.scale(pygame.image.load("images/png/character/walk/walk" + str(i) + ".png").convert_alpha(), (self.width, self.height)) for i in range(1, 12)], "max": 11, "speed": 25},
             "idle": {"frames": [pygame.transform.scale(pygame.image.load("images/png/character/side.png").convert_alpha(), (self.width, self.height))], "max": 1, "speed": 0},
@@ -30,11 +32,11 @@ class Player:
         self.moving = False
         self.grounded = False
 
-        self.lookingRight = True
+        self.lookingRight = True # to know in wich direction the player is facing
 
         self.timers = {
-            "coyoteJump": {"time": 0, "max": 0.2, "running": False, "looping": False},
-            "jumpBuffer": {"time": 0, "max": 0.2, "running": False, "looping": False}
+            "coyoteJump": {"time": 0, "max": 0.2, "running": False, "looping": False}, # so the player can jump 0.2s after falling off a ledge
+            "jumpBuffer": {"time": 0, "max": 0.2, "running": False, "looping": False} # so the player can jump even if they pressed the button 0.2s brfore landing on the ground
         }
     
         self.jumpSound = pygame.mixer.Sound("sfx/jump.wav")
@@ -48,6 +50,7 @@ class Player:
         self.coinImage = pygame.transform.scale(pygame.image.load("images/png/coin_silver.png"), (50, 50))
 
         self.dead = False
+        # the rotation is for the death and next level animations
         self.rotation = 0
         self.rotationSpeed = 1040.0
         self.rotationMax = 360
@@ -71,6 +74,7 @@ class Player:
             self.updateAnimations(dt)
             self.updateTimers(dt)
         else:
+            # do a death dance :(
             self.rotation += self.rotationSpeed * dt
             if self.rotation > self.rotationMax:
                 self.resetGame(enemies)
@@ -104,10 +108,11 @@ class Player:
             self.currentFrame = 0.0
     
     def applyGravity(self, dt):
-        self.velocity.y = min(self.velocity.y + self.acceleration.y * dt, self.maxSpeed.y)
+        self.velocity.y = min(self.velocity.y + self.acceleration.y * dt, self.maxSpeed.y) # so the player cannot fall faster than a certain speed
     
     def handleAcceleration(self, dt, keysPressed):
         self.moving = False
+        # here I iterate over the inputs.left (list) and check to see if it is pressed so I can easily add more bindings
         for key in inputs.left:
             if keysPressed[key]:
                 self.velocity.x = max(self.velocity.x - self.acceleration.x * dt, -self.maxSpeed.x)
@@ -122,6 +127,7 @@ class Player:
                 break
     
     def applyFriction(self, dt):
+        # if the player is not moving or he is moving in the opposite direction of where he is facing
         if not self.moving or self.lookingRight != (self.velocity.x > 0):
             self.velocity = self.velocity.move_towards(pygame.math.Vector2(0, self.velocity.y), self.friction * dt)
     
@@ -147,12 +153,13 @@ class Player:
                 self.velocity.y = self.jumpStr / 4
     
     def move(self, dt, blocks, enemies, coins, spikes, endAreas, keys, unlocked):
-        self.moveSingleAxis(dt, blocks, "x", unlocked)
+        self.moveSingleAxis(dt, blocks, "x", unlocked) # I move the player one axis at a time to avoid bugs
         self.moveSingleAxis(dt, blocks, "y", unlocked)
         self.feet.topleft = self.rect.bottomleft
         self.feet.left += self.feetBufferX
         
 
+        # check if the player is grounded by checking collision with the feet
         collideIndex = -1
         for i, block in enumerate(blocks):
             if type(block["rect"]) is pygame.rect.Rect and not (block["disappearing"] and unlocked):
@@ -165,6 +172,7 @@ class Player:
         else:
             self.grounded = False
         
+        # allow the player to kill enemies by jumping on them
         collideIndex = self.feet.collidelist(enemies)
         if collideIndex != -1:
             if enemies[collideIndex].alive:
@@ -172,6 +180,7 @@ class Player:
                 self.killSound.play()
                 self.velocity.y = self.jumpStr
         
+        # check if the player collided with an enemy (death)
         collideIndex = -1
         for i, enemy in enumerate(enemies):
             if enemy.alive and self.rect.colliderect(enemy.rect):
@@ -211,12 +220,13 @@ class Player:
             movedRect = self.rect.move(0, self.velocity.y * dt)
         self.feet.topleft = movedRect.bottomleft
         self.feet.left += self.feetBufferX
+        # check for collision before moving the player 
         colliding = False
         collideIndex = -1
         for i, block in enumerate(blocks):
             if type(block["rect"]) is pygame.rect.Rect:
                 if movedRect.colliderect(block["rect"]):
-                    if not (block["disappearing"] and unlocked):
+                    if not (block["disappearing"] and unlocked): # check if the block has disapeared
                         collideIndex = i
                         break
         if collideIndex != -1:
@@ -232,7 +242,7 @@ class Player:
             self.rect = movedRect
     
     def updateTimers(self, dt):
-        for k_timer in self.timers:
+        for k_timer in self.timers: # k_timer stands for key_timer (the timers key in the dict)
             timer = self.timers[k_timer]
             if timer["running"]:
                 timer["time"] += dt
@@ -266,6 +276,7 @@ class Player:
     def nextLevel(self):
         self.level += 1
         self.nextLevelSfx.play()
+        # do a cool little victory dance!
         while self.rotation < self.rotationMax:
             self.rotation += self.rotationSpeed * 1/30
             rotatedImage = pygame.transform.rotate(self.animations["jump"]["frames"][0], self.rotation)
